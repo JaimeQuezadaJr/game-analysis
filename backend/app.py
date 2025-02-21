@@ -19,15 +19,9 @@ class FortniteAnalyzer:
         self.max_muzzle_area = 1000
         self.shot_cooldown = 0.15
 
-        # Damage number detection parameters
-        self.damage_colors = [
-            # White damage numbers
-            (np.array([220, 220, 220]), np.array([255, 255, 255])),
-            # Yellow shield damage (in HSV)
-            (np.array([20, 150, 150]), np.array([40, 255, 255])),
-        ]
-        self.min_damage_area = 30
-        self.max_damage_area = 300
+        # Track last seen damage number
+        self.last_damage_position = None
+        self.last_damage_area = None
         self.hit_cooldown = 0.2
 
         # Center screen ROI (where most action happens)
@@ -55,6 +49,24 @@ class FortniteAnalyzer:
         y2 = center_y + roi_h // 2
         x1 = center_x - roi_w // 2
         x2 = center_x + roi_w // 2
+
+        return (x1, y1, x2, y2)
+
+    def get_damage_roi(self, frame):
+        """Get the region where damage numbers appear (right of crosshair)"""
+        h, w = frame.shape[:2]
+        center_y = h // 2
+        center_x = w // 2
+
+        # Focus on area just to the right of player model
+        roi_h = int(h * 0.25)  # 25% of screen height
+        roi_w = int(w * 0.25)  # 25% of screen width
+
+        # Position ROI to the right of player model
+        y1 = center_y - roi_h // 2  # Centered vertically
+        y2 = center_y + roi_h // 2
+        x1 = center_x - roi_w // 4  # Start closer to center
+        x2 = center_x + roi_w  # Extend right but not too far
 
         return (x1, y1, x2, y2)
 
@@ -121,42 +133,31 @@ class FortniteAnalyzer:
         return shot_detected
 
     def detect_hit(self, frame):
-        """Detect hits by looking for damage numbers next to enemies"""
+        """Detect hits by looking for damage numbers to the right of player"""
         original_frame = frame.copy()
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        # Get center ROI where enemies are typically located
-        x1, y1, x2, y2 = self.get_center_roi(frame)
+        # Get damage number ROI (right of crosshair)
+        x1, y1, x2, y2 = self.get_damage_roi(frame)
 
-        # Create masks for all damage numbers
-        # White damage numbers
+        # Create masks for damage numbers
         white_mask = cv2.inRange(
-            frame_rgb,
-            np.array([240, 240, 240]),  # Bright white
-            np.array([255, 255, 255]),
+            frame_rgb, np.array([240, 240, 240]), np.array([255, 255, 255])
         )
 
-        # Blue shield damage
         blue_mask = cv2.inRange(
-            frame_hsv,
-            np.array([90, 150, 200]),  # Bright blue
-            np.array([110, 255, 255]),
+            frame_hsv, np.array([85, 150, 200]), np.array([115, 255, 255])
         )
 
-        # Yellow shield break
-        yellow_mask = cv2.inRange(
-            frame_hsv,
-            np.array([25, 180, 180]),  # Bright yellow
-            np.array([35, 255, 255]),
-        )
+        # Focus only on the damage number area
+        white_roi = np.zeros_like(white_mask)
+        white_roi[y1:y2, x1:x2] = white_mask[y1:y2, x1:x2]
 
-        # Combine all damage number masks
-        combined_mask = cv2.bitwise_or(
-            cv2.bitwise_or(white_mask, yellow_mask), blue_mask
-        )
+        blue_roi = np.zeros_like(blue_mask)
+        blue_roi[y1:y2, x1:x2] = blue_mask[y1:y2, x1:x2]
 
-        # Focus on center portion
+        combined_mask = cv2.bitwise_or(white_mask, blue_mask)
         roi_mask = np.zeros_like(combined_mask)
         roi_mask[y1:y2, x1:x2] = combined_mask[y1:y2, x1:x2]
 
@@ -172,84 +173,79 @@ class FortniteAnalyzer:
                 x, y, w, h = cv2.boundingRect(contour)
                 aspect_ratio = h / w
 
+                # More strict criteria for damage numbers
                 if 1.2 < aspect_ratio < 2.5:
-                    # Determine damage type by color
-                    roi = frame[y : y + h, x : x + w]
-                    roi_hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                    # Ignore anything that looks like "XP" (usually wider)
+                    if w > 50:  # XP numbers tend to be wider
+                        continue
 
-                    damage_type = "Health"  # Default to white/health damage
+                    # Check if this is a different damage number
                     if (
-                        cv2.mean(
-                            cv2.bitwise_and(
-                                roi_hsv,
-                                roi_hsv,
-                                mask=cv2.inRange(
-                                    roi_hsv,
-                                    np.array([90, 150, 200]),
-                                    np.array([110, 255, 255]),
-                                ),
-                            )
-                        )[0]
-                        > 0
+                        self.last_damage_position is None
+                        or abs(area - self.last_damage_area) > 10
                     ):
-                        damage_type = "Shield"
-                    elif (
-                        cv2.mean(
-                            cv2.bitwise_and(
-                                roi_hsv,
-                                roi_hsv,
-                                mask=cv2.inRange(
-                                    roi_hsv,
-                                    np.array([25, 180, 180]),
-                                    np.array([35, 255, 255]),
-                                ),
+                        # Create masks for just this contour
+                        number_mask = np.zeros_like(white_mask)
+                        cv2.drawContours(number_mask, [contour], -1, 255, -1)
+
+                        # Check if this number appears in blue mask
+                        blue_pixels = cv2.countNonZero(
+                            cv2.bitwise_and(blue_roi, number_mask)
+                        )
+                        white_pixels = cv2.countNonZero(
+                            cv2.bitwise_and(white_roi, number_mask)
+                        )
+
+                        # More strict shield damage detection
+                        # A shield hit must have significantly more blue pixels than white
+                        is_shield = blue_pixels > white_pixels and blue_pixels > (
+                            area * 0.5
+                        )
+
+                        self.last_damage_type = "Shield" if is_shield else "Health"
+                        self.last_damage_position = (x, y)
+                        self.last_damage_area = area
+                        hit_detected = True
+
+                        if self.debug:
+                            cv2.drawContours(
+                                original_frame, [contour], -1, (0, 0, 255), 2
                             )
-                        )[0]
-                        > 0
-                    ):
-                        damage_type = "Shield Break"
-
-                    self.last_damage_type = damage_type  # Store the damage type
-                    hit_detected = True
-
-                    if self.debug:
-                        cv2.drawContours(original_frame, [contour], -1, (0, 0, 255), 2)
-                        cv2.putText(
-                            original_frame,
-                            f"{damage_type} Damage - Area: {area:.1f}, Ratio: {aspect_ratio:.2f}",
-                            (x, y - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5,
-                            (0, 0, 255),
-                            2,
-                        )
-                        # Save the damage number region
-                        damage_roi = frame[y : y + h, x : x + w]
-                        cv2.imwrite(
-                            f"{self.debug_dir}/damage_number_{self.frame_count}_{damage_type}_{x}_{y}.jpg",
-                            damage_roi,
-                        )
-                        print(
-                            f"Frame {self.frame_count}: {damage_type} damage detected!"
-                        )
-                        print(f"  Position: ({x}, {y})")
-                        print(f"  Size: {w}x{h}")
-                        print(f"  Area: {area:.1f}")
-                        print(f"  Aspect ratio: {aspect_ratio:.2f}")
+                            color_type = "BLUE" if is_shield else "WHITE"
+                            cv2.putText(
+                                original_frame,
+                                f"NEW {self.last_damage_type} Damage ({color_type}) - Area: {area:.1f}",
+                                (x, y - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.5,
+                                (0, 0, 255),
+                                2,
+                            )
+                            print(f"Frame {self.frame_count}: New damage detected!")
+                            print(f"  Type: {self.last_damage_type}")
+                            print(f"  Area: {area:.1f}")
+                            print(f"  Position: ({x}, {y})")
+                            print(f"  Blue pixels: {blue_pixels}")
+                            print(f"  White pixels: {white_pixels}")
+                            print(
+                                f"  Ratio blue/total: {blue_pixels/(blue_pixels + white_pixels):.2f}"
+                            )
+                    break
 
         if self.debug:
-            # Draw ROI
+            # Draw damage number ROI
             cv2.rectangle(original_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-            # Save debug image showing all masks
+            cv2.putText(
+                original_frame,
+                "Damage Number ROI",
+                (x1 + 10, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2,
+            )
             debug_img = np.vstack(
-                [
-                    original_frame,
-                    cv2.cvtColor(white_mask, cv2.COLOR_GRAY2BGR),
-                    cv2.cvtColor(blue_mask, cv2.COLOR_GRAY2BGR),
-                    cv2.cvtColor(yellow_mask, cv2.COLOR_GRAY2BGR),
-                    cv2.cvtColor(combined_mask, cv2.COLOR_GRAY2BGR),
-                ]
+                [original_frame, cv2.cvtColor(roi_mask, cv2.COLOR_GRAY2BGR)]
             )
             cv2.imwrite(
                 f"{self.debug_dir}/hit_detection_{self.frame_count}.jpg", debug_img
@@ -280,6 +276,7 @@ def process_video(video_path, debug=False):
     last_shot_time = None
     last_hit_time = None
     frame_id = 0
+    first_shot_fired = False
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -296,32 +293,22 @@ def process_video(video_path, debug=False):
             ):
                 stats["total_shots"] += 1
                 last_shot_time = current_time
-                if debug:
-                    print(f"Shot fired at {current_time:.2f}s (frame {frame_id})")
+                first_shot_fired = True
 
-        # Detect hits by checking for damage numbers
-        if analyzer.detect_hit(frame):
-            if (
-                last_hit_time is None
-                or (current_time - last_hit_time) > analyzer.hit_cooldown
-            ):
-                stats["total_hits"] += 1
-                # Track the type of hit
-                if analyzer.last_damage_type == "Shield":
-                    stats["shield_hits"] += 1
-                elif analyzer.last_damage_type == "Health":
-                    stats["health_hits"] += 1
-                else:
-                    stats["shield_break_hits"] += 1
+        # Only look for hits after first shot is fired
+        if first_shot_fired:
+            if analyzer.detect_hit(frame):
+                if (
+                    last_hit_time is None
+                    or (current_time - last_hit_time) > analyzer.hit_cooldown
+                ):
+                    if analyzer.last_damage_type == "Shield":
+                        stats["shield_hits"] += 1
+                    else:
+                        stats["health_hits"] += 1
 
-                last_hit_time = current_time
-                if debug:
-                    print(
-                        f"Hit confirmed at {current_time:.2f}s ({analyzer.last_damage_type})"
-                    )
-
-        if debug and frame_id % 30 == 0:  # Print progress every 30 frames
-            print(f"Processing frame {frame_id}/{total_frames}")
+                    stats["total_hits"] = stats["shield_hits"] + stats["health_hits"]
+                    last_hit_time = current_time
 
         frame_id += 1
 
