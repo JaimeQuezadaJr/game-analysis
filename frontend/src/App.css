@@ -1,38 +1,190 @@
-.App {
-  text-align: center;
+@import url('https://fonts.googleapis.com/css2?family=Burbank+Big+Condensed&display=swap');
+
+:root {
+  --fortnite-blue: #1c9ad6;
+  --fortnite-purple: #9d4dbb;
+  --fortnite-yellow: #f3af19;
+  --fortnite-green: #2ac36a;
+  --fortnite-dark: #1e1e1e;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+body {
+  background: linear-gradient(135deg, #0d253f, #1c2541);
   color: white;
+  font-family: 'Burbank Big Condensed', sans-serif;
+  min-height: 100vh;
 }
 
-.App-link {
-  color: #61dafb;
+.fortnite-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+.fortnite-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+}
+
+.fortnite-header h1 {
+  font-size: 3.5rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: white;
+  text-shadow: 0 0 10px var(--fortnite-blue), 
+               0 0 20px var(--fortnite-purple);
+  margin: 0;
+}
+
+.fortnite-card {
+  background-color: rgba(30, 30, 30, 0.8);
+  border-radius: 10px;
+  padding: 30px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  border: 2px solid var(--fortnite-blue);
+}
+
+.upload-section {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-label {
+  background-color: var(--fortnite-purple);
+}
+
+.fortnite-button {
+  padding: 12px 24px;
+  font-family: 'Burbank Big Condensed', sans-serif;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background-color: var(--fortnite-blue);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+.fortnite-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+}
+
+.fortnite-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.fortnite-button.disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.file-name {
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--fortnite-yellow);
+  font-size: 1.1rem;
+}
+
+.progress-container {
+  margin: 30px 0;
+}
+
+.status-text {
+  text-align: center;
+  margin-bottom: 10px;
+  color: var(--fortnite-yellow);
+  font-size: 1.2rem;
+}
+
+.progress-bar-bg {
+  height: 25px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  overflow: hidden;
+  border: 2px solid var(--fortnite-blue);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--fortnite-blue), var(--fortnite-purple));
+  transition: width 0.3s ease-in-out;
+  border-radius: 15px;
+}
+
+.results-container {
+  margin-top: 30px;
+}
+
+.results-header {
+  text-align: center;
+  font-size: 2.2rem;
+  margin-bottom: 20px;
+  color: var(--fortnite-yellow);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.stat-box {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  border: 2px solid var(--fortnite-blue);
+  transition: transform 0.2s;
+}
+
+.stat-box:hover {
+  transform: translateY(-5px);
+  border-color: var(--fortnite-yellow);
+}
+
+.stat-label {
+  font-size: 1.1rem;
+  color: var(--fortnite-blue);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 2rem;
+  color: white;
+  text-shadow: 0 0 5px var(--fortnite-blue);
+}
+
+@media (max-width: 600px) {
+  .upload-section {
+    flex-direction: column;
   }
-  to {
-    transform: rotate(360deg);
+  
+  .fortnite-header h1 {
+    font-size: 2.5rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 }
