@@ -41,6 +41,13 @@ function App() {
         }
       });
 
+      // Log the structured data
+      console.log("Extracted Match Data:", {
+        timestamp: new Date().toISOString(),
+        filename: file.name,
+        data: response.data
+      });
+
       setReport(response.data);
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -100,26 +107,70 @@ function App() {
           <div className="results-container">
             <h2 className="results-header">MATCH SUMMARY</h2>
             
-            {/* Placement */}
-            {report.placement && (
-              <div className="placement-box">
-                {report.placement}
-              </div>
-            )}
-            
             {/* Match Stats */}
-            {report.match_stats && Object.keys(report.match_stats).length > 0 && (
+            {report.match_summary && (
               <div className="stats-grid">
-                {Object.entries(report.match_stats).map(([key, value]) => (
-                  <div className="stat-box" key={key}>
-                    <div className="stat-label">{key}</div>
-                    <div className="stat-value">
-                      {key === "Accuracy" ? `${value}%` : 
-                       key === "Distance Traveled" ? `${value}km` :
-                       value}
-                    </div>
-                  </div>
-                ))}
+                {/* Always show Placement first */}
+                <div className="stat-box placement-stat">
+                  <div className="stat-label">Placement</div>
+                  <div className="stat-value">{report.match_summary.placement}</div>
+                </div>
+
+                {/* Combat Stats */}
+                <div className="stat-box">
+                  <div className="stat-label">Eliminations</div>
+                  <div className="stat-value">{report.match_summary.combat_stats.eliminations}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Damage Dealt</div>
+                  <div className="stat-value">{report.match_summary.combat_stats.damage_dealt}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Damage Taken</div>
+                  <div className="stat-value">{report.match_summary.combat_stats.damage_taken}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Accuracy</div>
+                  <div className="stat-value">{`${report.match_summary.combat_stats.accuracy}%`}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Hits</div>
+                  <div className="stat-value">{report.match_summary.combat_stats.hits}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Headshots</div>
+                  <div className="stat-value">{report.match_summary.combat_stats.headshots}</div>
+                </div>
+
+                {/* Support Stats */}
+                <div className="stat-box">
+                  <div className="stat-label">Assists</div>
+                  <div className="stat-value">{report.match_summary.support_stats.assists}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Revives</div>
+                  <div className="stat-value">{report.match_summary.support_stats.revives}</div>
+                </div>
+
+                {/* Resource Stats */}
+                <div className="stat-box">
+                  <div className="stat-label">Materials Gathered</div>
+                  <div className="stat-value">{report.match_summary.resource_stats.materials_gathered}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Materials Used</div>
+                  <div className="stat-value">{report.match_summary.resource_stats.materials_used}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Damage to Structures</div>
+                  <div className="stat-value">{report.match_summary.resource_stats.damage_to_structures}</div>
+                </div>
+
+                {/* Movement Stats */}
+                <div className="stat-box">
+                  <div className="stat-label">Distance Traveled</div>
+                  <div className="stat-value">{`${report.match_summary.movement_stats.distance_traveled}km`}</div>
+                </div>
               </div>
             )}
           </div>

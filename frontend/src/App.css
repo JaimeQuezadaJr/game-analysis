@@ -302,3 +302,50 @@ body::before {
     font-size: 2rem;
   }
 }
+
+.victory-box {
+  text-align: center;
+  margin: 20px auto 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+  border-radius: 12px;
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  animation: victoryGlow 2s ease-in-out infinite;
+  max-width: 600px;
+}
+
+@keyframes victoryGlow {
+  0% { box-shadow: 0 0 20px rgba(255, 107, 107, 0.5); }
+  50% { box-shadow: 0 0 30px rgba(255, 217, 61, 0.7); }
+  100% { box-shadow: 0 0 20px rgba(255, 107, 107, 0.5); }
+}
+
+.placement-stat {
+  grid-column: 1 / -1;  /* Make it span full width */
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 140, 0, 0.1)) !important;
+  border: 1px solid rgba(255, 215, 0, 0.3) !important;
+}
+
+.placement-stat::before {
+  background: linear-gradient(90deg, #ffd700, #ff8c00) !important;
+  opacity: 1 !important;
+}
+
+.placement-stat .stat-value {
+  font-size: 3rem;
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+.placement-stat:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(255, 215, 0, 0.2);
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 140, 0, 0.15)) !important;
+}

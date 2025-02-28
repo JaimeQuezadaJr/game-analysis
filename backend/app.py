@@ -16,10 +16,10 @@ class FortniteStatsExtractor:
     def __init__(self):
         self.stats_roi = {
             "victory": {
-                "top": 0.05,  # 5% from top
-                "height": 0.2,  # 20% of height
-                "left": 0.35,  # 35% from left
-                "width": 0.3,  # 30% of width
+                "top": 0.15,  # 15% from top
+                "height": 0.15,  # 15% of height
+                "left": 0.3,  # 30% from left
+                "width": 0.4,  # 40% of width
             },
             "match_stats": {
                 "top": 0.2,  # 20% from top
@@ -165,6 +165,31 @@ class FortniteStatsExtractor:
 
         return stats
 
+    def clean_victory_text(self, text):
+        """Clean up victory text"""
+        text = text.strip().upper()
+        if "VICTORY" in text and "ROYALE" in text:
+            return "#1 VICTORY ROYALE"
+        return text
+
+    def get_placement_number(self, text):
+        """Extract placement number from victory/placement text"""
+        if "VICTORY" in text.upper() or "#1" in text:
+            return "1st"
+        # For other placements (future use)
+        numbers = "".join(c for c in text if c.isdigit())
+        if numbers:
+            num = int(numbers)
+            if num == 1:
+                return "1st"
+            elif num == 2:
+                return "2nd"
+            elif num == 3:
+                return "3rd"
+            else:
+                return f"{num}th"
+        return None
+
     def process_image(self, image_path):
         """Process the image and extract all relevant information"""
         # Read image
@@ -175,22 +200,44 @@ class FortniteStatsExtractor:
         # Preprocess image
         processed = self.preprocess_image(image)
 
-        # Extract victory text
-        victory_roi = self.get_roi(processed, self.stats_roi["victory"])
-        victory_text = self.extract_text(victory_roi)
-
-        # Extract match stats
+        # Extract match stats first
         stats_roi = self.get_roi(processed, self.stats_roi["match_stats"])
         stats_text = self.extract_text(stats_roi)
-
-        # Parse the stats
         match_stats = self.parse_stats(stats_text)
 
-        return {
-            "placement": victory_text,
-            "match_stats": match_stats,
+        # Always set placement to "1st" for Victory Royale screens
+        match_stats["Placement"] = "1st"
+
+        # Create structured JSON response
+        response = {
+            "match_summary": {
+                "placement": match_stats["Placement"],
+                "combat_stats": {
+                    "eliminations": match_stats["Eliminations"],
+                    "damage_dealt": match_stats["Damage To Players"],
+                    "damage_taken": match_stats["Damage Taken"],
+                    "accuracy": match_stats["Accuracy"],
+                    "hits": match_stats["Hits"],
+                    "headshots": match_stats["Head Shots"],
+                },
+                "support_stats": {
+                    "assists": match_stats["Assists"],
+                    "revives": match_stats["Revives"],
+                },
+                "resource_stats": {
+                    "materials_gathered": match_stats["Materials Gathered"],
+                    "materials_used": match_stats["Materials Used"],
+                    "damage_to_structures": match_stats["Damage To Structures"],
+                },
+                "movement_stats": {
+                    "distance_traveled": match_stats["Distance Traveled"]
+                },
+            },
+            "raw_stats": match_stats,  # Include original stats for reference
             "status": "complete",
         }
+
+        return response
 
 
 @app.route("/upload", methods=["POST"])
