@@ -5,11 +5,43 @@ import os
 from flask_cors import CORS
 import pytesseract
 from PIL import Image
+import openai
+from dotenv import load_dotenv
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Initialize OpenAI client
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Simple in-memory rate limiting
+RATE_LIMIT = 10  # requests per minute
+request_counts = defaultdict(list)
+
+
+def is_rate_limited(ip):
+    """Basic rate limiting check"""
+    now = datetime.now()
+    minute_ago = now - timedelta(minutes=1)
+
+    # Clean old requests
+    request_counts[ip] = [
+        timestamp for timestamp in request_counts[ip] if timestamp > minute_ago
+    ]
+
+    # Check if under rate limit
+    if len(request_counts[ip]) >= RATE_LIMIT:
+        return True
+
+    # Add new request
+    request_counts[ip].append(now)
+    return False
 
 
 class FortniteStatsExtractor:
@@ -263,6 +295,94 @@ def upload_image():
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
+
+
+@app.route("/analyze", methods=["POST"])
+def analyze_stats():
+    try:
+        # Basic rate limiting
+        if is_rate_limited(request.remote_addr):
+            return (
+                jsonify({"error": "Rate limit exceeded. Please try again later."}),
+                429,
+            )
+
+        match_data = request.json.get("match_data")
+        if not match_data:
+            return jsonify({"error": "No match data provided"}), 400
+
+        # Prepare the prompt for GPT
+        prompt = f"""
+        As a Fortnite expert, analyze these match statistics and provide 3-4 key insights about the player's performance:
+
+        Placement: {match_data['placement']}
+        
+        Combat Stats:
+        - Eliminations: {match_data['combat_stats']['eliminations']}
+        - Damage Dealt: {match_data['combat_stats']['damage_dealt']}
+        - Damage Taken: {match_data['combat_stats']['damage_taken']}
+        - Accuracy: {match_data['combat_stats']['accuracy']}%
+        - Hits: {match_data['combat_stats']['hits']}
+        - Headshots: {match_data['combat_stats']['headshots']}
+        
+        Support Stats:
+        - Assists: {match_data['support_stats']['assists']}
+        - Revives: {match_data['support_stats']['revives']}
+        
+        Resource Stats:
+        - Materials Gathered: {match_data['resource_stats']['materials_gathered']}
+        - Materials Used: {match_data['resource_stats']['materials_used']}
+        - Damage to Structures: {match_data['resource_stats']['damage_to_structures']}
+        
+        Movement:
+        - Distance Traveled: {match_data['movement_stats']['distance_traveled']}km
+
+        Focus on:
+        1. Combat effectiveness and accuracy
+        2. Resource management and building strategy
+        3. Overall performance and areas for improvement
+        
+        Keep insights concise and actionable.
+        """
+
+        # Get analysis from GPT-3.5 Turbo
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert Fortnite coach providing concise, actionable insights.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.7,  # Slightly creative but still focused
+            max_tokens=200,  # Limit response length
+        )
+
+        # Extract and format insights
+        analysis = response.choices[0].message.content.split("\n")
+        analysis = [insight.strip() for insight in analysis if insight.strip()]
+
+        return jsonify(
+            {
+                "analysis": analysis,
+                "tokens_used": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                },
+            }
+        )
+
+    except openai.error.RateLimitError:
+        return (
+            jsonify({"error": "AI service is currently busy. Please try again later."}),
+            429,
+        )
+    except openai.error.AuthenticationError:
+        return jsonify({"error": "AI service configuration error."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
