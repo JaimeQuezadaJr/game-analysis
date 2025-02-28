@@ -1,57 +1,54 @@
 import React, { useState } from "react";
 import axios from "axios";
-import './App.css'; // We'll create this file next
+import './App.css';
 
 function App() {
   const [file, setFile] = useState(null);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
 
   const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+    const selectedFile = e.target.files[0];
+    
+    // Verify file is an image
+    if (selectedFile && !selectedFile.type.startsWith('image/')) {
+      setError("Please select an image file");
+      return;
+    }
+    
+    setFile(selectedFile);
     setReport(null);
-    setProgress(0);
-    setStatus("");
+    setError("");
   };
 
   const handleUpload = async () => {
-    if (!file) return alert("Please select a file!");
+    if (!file) {
+      setError("Please select an image file!");
+      return;
+    }
 
     setLoading(true);
-    setStatus("Uploading video...");
-    setProgress(0);
+    setError("");
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("debug", "true");
 
     try {
       const response = await axios.post("http://127.0.0.1:5000/upload", formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: (progressEvent) => {
-          const uploadProgress = Math.round(
-            (progressEvent.loaded / progressEvent.total) * 50
-          );
-          setProgress(uploadProgress);
-          setStatus("Uploading video... " + uploadProgress + "%");
-        },
+        }
       });
 
-      setProgress(100);
-      setStatus("Processing complete!");
       setReport(response.data);
     } catch (error) {
       console.error("Error uploading file:", error);
-      setStatus(
+      setError(
         error.response?.data?.error || 
         error.message || 
-        "Error processing video"
+        "Error processing image"
       );
-      setProgress(0);
     } finally {
       setLoading(false);
     }
@@ -60,20 +57,20 @@ function App() {
   return (
     <div className="fortnite-container">
       <div className="fortnite-header">
-        <h1>FORTNITE AIM TRACKER</h1>
+        <h1>FORTNITE STATS EXTRACTOR</h1>
       </div>
       
       <div className="fortnite-card">
         <div className="upload-section">
           <input 
             type="file" 
-            accept="video/*" 
+            accept="image/*" 
             onChange={handleFileChange} 
             id="file-upload"
             className="file-input"
           />
           <label htmlFor="file-upload" className="fortnite-button file-label">
-            SELECT VIDEO
+            SELECT IMAGE
           </label>
           <button 
             onClick={handleUpload} 
@@ -91,51 +88,40 @@ function App() {
           </div>
         )}
 
-        {/* Progress Bar */}
-        {(loading || status) && (
-          <div className="progress-container">
-            <div className="status-text">
-              {status}
-            </div>
-            <div className="progress-bar-bg">
-              <div 
-                className="progress-bar-fill" 
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+        {/* Error message */}
+        {error && (
+          <div className="error-message">
+            {error}
           </div>
         )}
 
         {/* Results */}
         {report && !loading && (
           <div className="results-container">
-            <h2 className="results-header">BATTLE REPORT</h2>
-            <div className="stats-grid">
-              <div className="stat-box">
-                <div className="stat-label">SHOTS FIRED</div>
-                <div className="stat-value">{report.total_shots}</div>
+            <h2 className="results-header">MATCH SUMMARY</h2>
+            
+            {/* Placement */}
+            {report.placement && (
+              <div className="placement-box">
+                {report.placement}
               </div>
-              <div className="stat-box">
-                <div className="stat-label">HITS LANDED</div>
-                <div className="stat-value">{report.total_hits}</div>
+            )}
+            
+            {/* Match Stats */}
+            {report.match_stats && Object.keys(report.match_stats).length > 0 && (
+              <div className="stats-grid">
+                {Object.entries(report.match_stats).map(([key, value]) => (
+                  <div className="stat-box" key={key}>
+                    <div className="stat-label">{key}</div>
+                    <div className="stat-value">
+                      {key === "Accuracy" ? `${value}%` : 
+                       key === "Distance Traveled" ? `${value}km` :
+                       value}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="stat-box">
-                <div className="stat-label">ACCURACY</div>
-                <div className="stat-value">{typeof report.accuracy === 'number' ? report.accuracy.toFixed(2) : '0.00'}%</div>
-              </div>
-              <div className="stat-box">
-                <div className="stat-label">SHIELD HITS</div>
-                <div className="stat-value">{report.shield_hits}</div>
-              </div>
-              <div className="stat-box">
-                <div className="stat-label">HEALTH HITS</div>
-                <div className="stat-value">{report.health_hits}</div>
-              </div>
-              <div className="stat-box">
-                <div className="stat-label">DURATION</div>
-                <div className="stat-value">{typeof report.video_duration === 'number' ? report.video_duration.toFixed(2) : '0.00'}s</div>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </div>
