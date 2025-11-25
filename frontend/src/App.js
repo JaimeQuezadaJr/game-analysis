@@ -32,8 +32,14 @@ function App() {
       });
       setAiAnalysis(response.data.analysis);
     } catch (error) {
-      console.error("Error getting AI analysis:", error);
-      setError("Failed to get AI analysis");
+      // If AI analysis is not available (no API key), don't show as error
+      if (error.response?.status === 503 && error.response?.data?.available === false) {
+        setAiAnalysis(["AI analysis is not currently available. Configure OPENAI_API_KEY in your backend .env file to enable this feature."]);
+      } else {
+        console.error("Error getting AI analysis:", error);
+        // Don't set this as a main error since stats extraction still worked
+        setAiAnalysis(["Unable to generate AI analysis at this time."]);
+      }
     } finally {
       setAnalysisLoading(false);
     }
