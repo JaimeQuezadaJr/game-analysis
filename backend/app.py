@@ -17,8 +17,10 @@ CORS(app)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Initialize OpenAI client
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Initialize OpenAI client (optional - AI analysis will be disabled if not set)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if OPENAI_API_KEY:
+    openai.api_key = OPENAI_API_KEY
 
 # Simple in-memory rate limiting
 RATE_LIMIT = 10  # requests per minute
@@ -300,6 +302,18 @@ def upload_image():
 @app.route("/analyze", methods=["POST"])
 def analyze_stats():
     try:
+        # Check if OpenAI API key is configured
+        if not OPENAI_API_KEY:
+            return (
+                jsonify(
+                    {
+                        "error": "AI analysis is not available. Please configure OPENAI_API_KEY in your .env file to enable this feature.",
+                        "available": False,
+                    }
+                ),
+                503,
+            )
+
         # Basic rate limiting
         if is_rate_limited(request.remote_addr):
             return (
